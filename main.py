@@ -155,6 +155,7 @@ class Alien:
 
 class Game:
     def __init__(self):
+        self.running = True
         self.player = Player()
         self.bullet = Bullet()
         self.aliens = []
@@ -170,37 +171,45 @@ class Game:
         self.setup_controls()
         self.reset_game()
 
-    def reset_game(self):
-        # Clear game over messages
-        if self.game_over_text is not None:
-            self.game_over_text.clear()
-            self.game_over_text.hideturtle()
-            self.game_over_text = None
-
-        # Clear all aliens
-        for alien in self.aliens[:]:  # Use slice copy to avoid modification issues
+    def cleanup(self):
+        """Clean up all turtle objects"""
+        for alien in self.aliens:
             alien.turtle.hideturtle()
+            alien.turtle.clear()
         self.aliens.clear()
         
-        # Reset score display
+        if self.game_over_text:
+            self.game_over_text.clear()
+            self.game_over_text.hideturtle()
+        
         self.score_pen.clear()
         self.lives_pen.clear()
         
-        # Reset player and bullet
-        self.player = Player()
-        self.bullet.turtle.hideturtle()
-        self.bullet.state = "ready"
+        for life in self.life_icons:
+            life.clear()
+            life.hideturtle()
         
-        # Reset game state
+        self.player.turtle.clear()
+        self.player.turtle.hideturtle()
+        self.bullet.turtle.clear()
+        self.bullet.turtle.hideturtle()
+
+    def reset_game(self):
+        # Clear everything properly first
+        self.cleanup()
+        
+        # Create fresh objects
+        self.player = Player()
+        self.bullet = Bullet()
+        self.aliens = []
         self.game_over = False
+        self.game_over_text = None
         
         # Setup new game
         self.setup_aliens()
+        self.setup_lives_display()
         self.update_score()
-        self.update_lives_display()
-        
-        # Ensure controls are active
-        self.setup_controls()
+        screen.update()
 
     def setup_display(self):
         self.score_pen = turtle.Turtle()
@@ -371,11 +380,34 @@ class Game:
 def main():
     game = Game()
     
-    # Main game loop
-    while True:
-        screen.onkey(game.handle_restart, "r")  # Changed to handle_restart
-        screen.listen()
-        game.update()
+    try:
+        # Main game loop
+        while game.running:
+            try:
+                # Handle quit event
+                for event in screen.getcanvas().winfo_children():
+                    if hasattr(event, 'type') and event.type == turtle.QUIT:
+                        game.running = False
+                        break
+                
+                screen.onkey(game.handle_restart, "r")
+                screen.onkey(lambda: setattr(game, 'running', False), "Escape")  # Add escape to quit
+                screen.listen()
+                
+                game.update()
+                screen.update()
+                
+            except Exception as e:
+                print(f"Error in game loop: {e}")
+                break
+                
+    finally:
+        # Clean up properly
+        game.cleanup()
+        screen.clear()
+        screen.bye()
+        pygame.mixer.quit()
+        pygame.quit()
 
 if __name__ == "__main__":
     main()
